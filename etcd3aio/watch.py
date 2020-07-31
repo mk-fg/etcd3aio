@@ -109,7 +109,7 @@ class Watcher(object):
                     except grpclib.exceptions.StreamTerminatedError as err:
                         await self._handle_steam_termination(err)
 
-                stream.end()
+                await stream.end()
 
         self._sender_task = asyncio.get_running_loop().create_task(
             sender_task(self.timeout, self._metadata, self._run_receiver)
