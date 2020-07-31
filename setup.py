@@ -29,12 +29,12 @@ setup(
     author_email='aleksei.gusev@gmail.com',
     url='https://github.com/hron/etcd3aio',
     packages=[
-        'etcd3',
-        'etcd3.etcdrpc',
+        'etcd3aio',
+        'etcd3aio.etcdrpc',
     ],
     package_dir={
-        'etcd3': 'etcd3',
-        'etcd3.etcdrpc': 'etcd3/etcdrpc',
+        'etcd3aio': 'etcd3aio',
+        'etcd3aio.etcdrpc': 'etcd3aio/etcdrpc',
     },
     include_package_data=True,
     install_requires=requirements,
