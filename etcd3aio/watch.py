@@ -40,8 +40,7 @@ class Watcher(object):
         self._lock = asyncio.Lock()
         self._request_queue = asyncio.Queue(maxsize=10)
         self._callbacks = {}
-        self._sender_task = None
-        self._receiver_task = None
+        self._stream_task = None
         self._new_watch_cond = asyncio.Condition(lock=self._lock)
         self._new_watch = None
 
@@ -97,37 +96,42 @@ class Watcher(object):
             await self._cancel_no_lock(watch_id)
 
     async def _setup_stream(self):
-        if self._sender_task:
+        if self._stream_task:
             return
 
-        async def sender_task(metadata, run_receiver_fn):
-            async with self._watch_stub.Watch.open(metadata=metadata) as stream:
-                while request := await self._request_queue.get():
-                    try:
-                        await stream.send_message(request)
-                        await run_receiver_fn(stream)
-                    except grpclib.exceptions.StreamTerminatedError as err:
-                        await self._handle_steam_termination(err)
-
-                await stream.end()
-
-        self._sender_task = asyncio.get_running_loop().create_task(
-            sender_task(self._metadata, self._run_receiver)
-        )
-
-    async def _run_receiver(self, stream):
-        if self._receiver_task:
-            return
-
-        async def receiver_task():
-            nonlocal stream
+        async def stream_task(metadata):
             try:
-                while response := await stream.recv_message():
-                    await self._handle_response(response)
-            except grpclib.exceptions.StreamTerminatedError as err:
+                async with self._watch_stub.Watch.open(metadata=metadata) as stream:
+                    # Wait for first watch request to actually open http/2 stream for recv_message() task
+                    await stream.send_message(await self._request_queue.get())
+                    tasks = {
+                        asyncio.create_task(self._request_queue.get(), name='request'),
+                        asyncio.create_task(stream.recv_message(), name='response'),
+                    }
+                    while True:
+                        try:
+                            done, tasks = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                            for task in done:
+                                if task.get_name() == 'request':
+                                    await stream.send_message(await task)
+                                    tasks.add(asyncio.create_task(self._request_queue.get(), name='request'))
+                                if task.get_name() == 'response':
+                                    await self._handle_response(await task)
+                                    tasks.add(asyncio.create_task(stream.recv_message(), name='response'))
+                        except asyncio.CancelledError:
+                            tasks = asyncio.gather(*tasks)
+                            tasks.cancel()
+                            await tasks
+            except Exception as err:
                 await self._handle_steam_termination(err)
 
-        self._receiver_task = asyncio.get_running_loop().create_task(receiver_task())
+        def stream_task_callback(task):
+            if not task.cancelled() and (err := task.exception()):
+                _log.error('Unhaneld error in watcher stream: %s', err, exc_info=err)
+            self._stream_task = None
+
+        self._stream_task = asyncio.create_task(stream_task(self._metadata))
+        self._stream_task.add_done_callback(stream_task_callback)
 
     async def _handle_steam_termination(self, err):
         async with self._lock:
@@ -148,9 +152,8 @@ class Watcher(object):
 
     def close(self):
         """Close the streams for sending and receiving watch events."""
-        for t in (self._receiver_task, self._sender_task,):
-            if t:
-                t.cancel()
+        if self._stream_task:
+            self._stream_task.cancel()
 
     async def _handle_response(self, rs):
         async with self._lock:
