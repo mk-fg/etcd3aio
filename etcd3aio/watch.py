@@ -100,8 +100,8 @@ class Watcher(object):
         if self._sender_task:
             return
 
-        async def sender_task(timeout, metadata, run_receiver_fn):
-            async with self._watch_stub.Watch.open(timeout=timeout, metadata=metadata) as stream:
+        async def sender_task(metadata, run_receiver_fn):
+            async with self._watch_stub.Watch.open(metadata=metadata) as stream:
                 while request := await self._request_queue.get():
                     try:
                         await stream.send_message(request)
@@ -112,7 +112,7 @@ class Watcher(object):
                 await stream.end()
 
         self._sender_task = asyncio.get_running_loop().create_task(
-            sender_task(self.timeout, self._metadata, self._run_receiver)
+            sender_task(self._metadata, self._run_receiver)
         )
 
     async def _run_receiver(self, stream):
