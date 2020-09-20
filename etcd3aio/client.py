@@ -4,8 +4,6 @@ import inspect
 import tempfile
 import warnings
 
-import aiofiles
-
 import grpclib.exceptions
 from grpclib.client import Channel
 from grpclib.const import Status as grpclibStatus
@@ -172,9 +170,9 @@ class Etcd3Client:
 
             if all(cert_params):
                 ca_bundle = tempfile.mktemp()
-                async with aiofiles.open(ca_bundle, 'w') as cert_bundle:
+                with open(ca_bundle, 'w') as cert_bundle:
                     for cf_path in (self.cert_cert, self.ca_cert,):
-                        async with aiofiles.open(cf_path) as cf:
+                        with open(cf_path) as cf:
                             await cert_bundle.write(await cf.read())
                     await cert_bundle.flush()
                     self.channel._ssl.load_cert_chain(ca_bundle, keyfile=self.cert_key)

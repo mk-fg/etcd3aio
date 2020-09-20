@@ -115,7 +115,7 @@ class Watcher(object):
                                 if task.get_name() == 'request':
                                     await stream.send_message(await task)
                                     tasks.add(asyncio.create_task(self._request_queue.get(), name='request'))
-                                if task.get_name() == 'response':
+                                else:
                                     await self._handle_response(await task)
                                     tasks.add(asyncio.create_task(stream.recv_message(), name='response'))
                         except asyncio.CancelledError:
@@ -127,7 +127,7 @@ class Watcher(object):
 
         def stream_task_callback(task):
             if not task.cancelled() and (err := task.exception()):
-                _log.error('Unhaneld error in watcher stream: %s', err, exc_info=err)
+                _log.error('Unhanled error in watcher stream: %s', err, exc_info=err)
             self._stream_task = None
 
         self._stream_task = asyncio.create_task(stream_task(self._metadata))
