@@ -62,6 +62,7 @@ class Watcher(object):
 
             # Submit a create watch request.
             new_watch = _NewWatch(callback)
+            new_watch_cond = None
             await self._request_queue.put(rq)
             self._new_watch = new_watch
 
@@ -69,6 +70,7 @@ class Watcher(object):
                 # Wait for the request to be completed, or timeout.
                 try:
                     await asyncio.wait_for(self._new_watch_cond.wait(), self.timeout)
+                    new_watch_cond = self._new_watch_cond
                 except asyncio.TimeoutError:
                     raise exceptions.WatchTimedOut()
 
@@ -83,7 +85,7 @@ class Watcher(object):
             finally:
                 # Wake up threads stuck on add_callback call if any.
                 self._new_watch = None
-                self._new_watch_cond.notify_all()
+                if new_watch_cond: new_watch_cond.notify_all()
 
             return new_watch.id
 
