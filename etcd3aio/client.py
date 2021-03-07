@@ -443,6 +443,14 @@ class Etcd3Client:
 
     @_handle_errors
     @_ensure_channel
+    async def delete_range(self, range_start, range_end):
+        """Delete a range of keys."""
+        delete_request = self._build_delete_request(range_start, range_end)
+        return await self.kvstub.DeleteRange(
+            delete_request, timeout=self.timeout, metadata=self.metadata )
+
+    @_handle_errors
+    @_ensure_channel
     async def status(self):
         """Get the status of the responding member."""
         status_request = etcdrpc.StatusRequest()
