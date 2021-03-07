@@ -952,7 +952,7 @@ class Etcd3Client:
                                  sort_target='key',
                                  serializable=False,
                                  keys_only=False,
-                                 count_only=None,
+                                 count_only=False,
                                  min_mod_revision=None,
                                  max_mod_revision=None,
                                  min_create_revision=None,
@@ -987,6 +987,7 @@ class Etcd3Client:
                              '"version", "create", "mod" or "value"')
 
         range_request.serializable = serializable
+        if limit: range_request.limit = int(limit)
 
         return range_request
 
