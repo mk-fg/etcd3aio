@@ -171,3 +171,4 @@ async def reconnect_iter(conf, log=None):
 		log.debug('Connected to {}', ep)
 
 		yield etcd_client
+		log.debug('Disconnected from {}, reconnecting...', ep)
